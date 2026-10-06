@@ -1,4 +1,4 @@
-const CACHE='bulky-v11-3';
+const CACHE='bulky-v11-4';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon.svg'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>/^bulky-v/.test(k)&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
