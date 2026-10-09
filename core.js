@@ -10,7 +10,7 @@ const num=v=>Math.max(0,Number(String(v??'').replace(',','.'))||0);
 const volume=w=>(w.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((b,s)=>b+(s.done?num(s.kg)*num(s.reps):0),0),0);
 const completed=db=>Object.values(db.workouts||{}).filter(w=>w.finished===true);
 function migrate(input,now=new Date()){
- const db=copy(input);if(!db||Array.isArray(db)||typeof db!=='object'||db.version>18)throw Error('Ongeldige of nieuwere database');
+ const db=copy(input);if(!db||Array.isArray(db)||typeof db!=='object'||db.version>19)throw Error('Ongeldige of nieuwere database');
  for(const k of ['days','plans','workouts','settings','products','meals'])if(db[k]!=null&&(typeof db[k]!=='object'||Array.isArray(db[k])))throw Error('Ongeldig veld: '+k);
  db.days ||= {}; db.workouts ||= {};db.settings ||= {kcal:3150,protein:160};db.legacyWorkouts ||= {};db.activeSessions ||= {};db.scheduleHistory ||= [];
  if(db.modelVersion!==12){
@@ -36,7 +36,7 @@ function migrate(input,now=new Date()){
  for(const p of Object.values(db.plans||{})){if(!Array.isArray(p)||p.some(e=>!Array.isArray(e)||e.length<3))throw Error('Ongeldig schema')}
  for(const w of Object.values(db.workouts)){if(!w||!validDate(w.date)||w.finished!==true||!Array.isArray(w.exercises))throw Error('Ongeldige historische sessie');}
  for(const [id,w] of Object.entries(db.activeSessions)){if(!w||w.id!==id||!validDate(w.date)||w.finished||!Array.isArray(w.exercises))throw Error('Ongeldige actieve sessie');}
- db.version=18;return db;
+ db.version=19;return globalThis.BulkyReliable?BulkyReliable.migrate(db):db;
 }
 function schedule(db,date){
  const d=db.days[date];if(d&&Object.hasOwn(d,'planning'))return copy(d.planning);
