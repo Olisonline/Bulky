@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "score_rounding": "nearest integer, clamp to 0..100",
+  "levels": [
+    {
+      "level": 1,
+      "score_min": 0,
+      "score_max": 20,
+      "file": "assets/bulky-level-1.png"
+    },
+    {
+      "level": 2,
+      "score_min": 21,
+      "score_max": 40,
+      "file": "assets/bulky-level-2.png"
+    },
+    {
+      "level": 3,
+      "score_min": 41,
+      "score_max": 60,
+      "file": "assets/bulky-level-3.png"
+    },
+    {
+      "level": 4,
+      "score_min": 61,
+      "score_max": 80,
+      "file": "assets/bulky-level-4.png"
+    },
+    {
+      "level": 5,
+      "score_min": 81,
+      "score_max": 100,
+      "file": "assets/bulky-level-5.png"
+    }
+  ]
+}
