@@ -10,7 +10,8 @@ const num=v=>Math.max(0,Number(String(v??'').replace(',','.'))||0);
 const volume=w=>(w.exercises||[]).reduce((a,e)=>a+(e.sets||[]).reduce((b,s)=>b+(s.done?num(s.kg)*num(s.reps):0),0),0);
 const completed=db=>Object.values(db.workouts||{}).filter(w=>w.finished===true);
 function migrate(input,now=new Date()){
- const db=copy(input);if(!db||Array.isArray(db)||typeof db!=='object'||db.version>19)throw Error('Ongeldige of nieuwere database');
+ const db=copy(input);if(!db||Array.isArray(db)||typeof db!=='object'||db.version>20)throw Error('Ongeldige of nieuwere database');
+ if(db.modelVersion===12&&Object.hasOwn(db,'plans')&&db.plans===null)throw Error('Persoonlijk schema is ongeldig; herstel je back-up.');
  for(const k of ['days','plans','workouts','settings','products','meals'])if(db[k]!=null&&(typeof db[k]!=='object'||Array.isArray(db[k])))throw Error('Ongeldig veld: '+k);
  db.days ||= {}; db.workouts ||= {};db.settings ||= {kcal:3150,protein:160};db.legacyWorkouts ||= {};db.activeSessions ||= {};db.scheduleHistory ||= [];
  if(db.modelVersion!==12){
@@ -36,7 +37,7 @@ function migrate(input,now=new Date()){
  for(const p of Object.values(db.plans||{})){if(!Array.isArray(p)||p.some(e=>!Array.isArray(e)||e.length<3))throw Error('Ongeldig schema')}
  for(const w of Object.values(db.workouts)){if(!w||!validDate(w.date)||w.finished!==true||!Array.isArray(w.exercises))throw Error('Ongeldige historische sessie');}
  for(const [id,w] of Object.entries(db.activeSessions)){if(!w||w.id!==id||!validDate(w.date)||w.finished||!Array.isArray(w.exercises))throw Error('Ongeldige actieve sessie');}
- db.version=19;return globalThis.BulkyReliable?BulkyReliable.migrate(db):db;
+ db.version=20;if(globalThis.BulkyReliable)BulkyReliable.migrate(db);return globalThis.BulkyFlexible?BulkyFlexible.migrate(db):db;
 }
 function schedule(db,date){
  const d=db.days[date];if(d&&Object.hasOwn(d,'planning'))return copy(d.planning);
@@ -51,13 +52,13 @@ function start(db,name,now=new Date(),id=globalThis.crypto.randomUUID()){
  const active=Object.values(db.activeSessions).find(w=>w.name===name);if(active)return active;
  if(!db.plans[name])throw Error('Schema bestaat niet');const w={...draft(db,name,now),id,startedAt:now.getTime(),createdAt:now.getTime()};db.activeSessions[id]=w;ensureDay(db,w.date);return w;
 }
-function previous(db,name){const key=exerciseKey(name);for(const w of completed(db).sort((a,b)=>b.date.localeCompare(a.date)||(b.finishedAt||0)-(a.finishedAt||0))){const e=w.exercises.find(e=>exerciseKey(e.name)===key);if(e?.sets.some(s=>s.done&&num(s.reps)))return e}return null}
+function previous(db,name){const key=exerciseKey(name);for(const w of completed(db).sort((a,b)=>b.date.localeCompare(a.date)||(b.finishedAt||0)-(a.finishedAt||0))){const matches=w.exercises.filter(e=>exerciseKey(e.name)===key);const sets=matches.flatMap(e=>e.sets);if(sets.some(s=>s.done&&num(s.reps)))return {...matches[0],sets}}return null}
 function finish(db,id,now=new Date()){
  const active=db.activeSessions[id];if(!active)throw Error('Geen actieve sessie');
  if(!active.exercises.some(e=>e.sets.some(s=>s.done&&num(s.reps)>0)))throw Error('Vink eerst minstens één uitgevoerde set met reps af.');
  for(const e of active.exercises)for(const s of e.sets)if(s.done&&(!Number.isFinite(Number(s.kg))||Number(s.kg)<0||!Number.isInteger(Number(s.reps))||Number(s.reps)<=0))throw Error('Controleer de afgevinkte sets: geldig gewicht en positieve hele reps vereist.');
  const w=copy(active);w.finished=true;w.finishedAt=now.getTime();w.volume=volume(w);w.prs=[];
- for(const e of w.exercises){let best=Math.max(0,...completed(db).flatMap(x=>x.exercises.filter(y=>exerciseKey(y.name)===exerciseKey(e.name)).flatMap(y=>y.sets.filter(s=>s.done).map(s=>num(s.kg)*(1+num(s.reps)/30)))));for(const s of e.sets){const e1=num(s.kg)*(1+num(s.reps)/30);if(s.done&&num(s.reps)&&e1>best){w.prs.push({name:e.name,kg:num(s.kg),reps:num(s.reps),e1});best=e1}}}
+ const sessionBests=new Map();for(const e of w.exercises){let best=sessionBests.get(exerciseKey(e.name))??Math.max(0,...completed(db).flatMap(x=>x.exercises.filter(y=>exerciseKey(y.name)===exerciseKey(e.name)).flatMap(y=>y.sets.filter(s=>s.done).map(s=>num(s.kg)*(1+num(s.reps)/30)))));for(const s of e.sets){const e1=num(s.kg)*(1+num(s.reps)/30);if(s.done&&num(s.reps)&&e1>best){w.prs.push({name:e.name,kg:num(s.kg),reps:num(s.reps),e1});best=e1}}sessionBests.set(exerciseKey(e.name),best)}
  db.workouts[id]=w;delete db.activeSessions[id];return w;
 }
 const SCORE_WEIGHTS={calories:45,protein:30,workout:15,creatine:10};
